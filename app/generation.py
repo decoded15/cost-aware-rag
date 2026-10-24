@@ -2,7 +2,7 @@
 import requests
 
 OLLAMA_URL = "http://localhost:11434/api/chat"
-MODEL_NAME = "qwen3:4b"
+MODEL_NAME = "qwen2.5:3b"
 
 
 def generate_answer(question: str, context: str) -> str:
@@ -14,11 +14,12 @@ def generate_answer(question: str, context: str) -> str:
                 {
                     "role": "system",
                     "content": (
-                        "Answer the user's question using only the "
-                        "provided context. If the context doesn't "
-                        "contain the answer, say you don't have "
-                        "enough information. Cite sources using the "
-                        "source labels included in the context."
+                        "You are a concise document question-answering assistant. "
+                        "Answer the question directly in at most 3 sentences. "
+                        "Use only facts explicitly stated in the supplied context. "
+                        "Do not explain your reasoning or repeat the question. "
+                        "If the context does not contain the answer, say so. "
+                        "Include the relevant source label in your answer."
                     ),
                 },
                 {
@@ -30,8 +31,12 @@ def generate_answer(question: str, context: str) -> str:
                 },
             ],
             "stream": False,
+            "options" : {
+                "num_predict" : 256,
+                "temperature" : 0.1,
+            },
         },
-        timeout=120,
+        timeout=(10, 600),
     )
 
     response.raise_for_status()
