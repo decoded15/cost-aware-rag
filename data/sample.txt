@@ -1,0 +1,9 @@
+Retrieval-Augmented Generation (RAG) combines information retrieval with language model generation.
+
+A RAG system retrieves relevant passages from a document collection and provides them as context to a language model.
+
+Document chunking divides long documents into smaller text segments. Good chunking helps retrieval find useful information without sending an entire document to the language model.
+
+Semantic caching can reuse answers to sufficiently similar questions. Cache validity and similarity thresholds must be handled carefully to avoid returning incorrect answers.
+
+Cost-aware model routing selects an appropriate language model based on factors such as request complexity, expected quality, latency, and cost.
