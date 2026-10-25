@@ -239,10 +239,6 @@ Cache hits depend on cache state, expiration, similarity thresholds, and safety 
 - Improve cache invalidation and document lifecycle management.
 - Add automated tests, structured logging, and deployment configuration.
 
-## License
-
-Choose and add a license before distributing or reusing this project publicly.
-
 ---
 
 **Cost-Aware RAG Gateway** explores how retrieval, semantic caching, and query-aware model selection can work together to build more efficient, observable LLM applications.
