@@ -1,15 +1,13 @@
-
 from pathlib import Path
 from uuid import uuid5, NAMESPACE_URL
-
+from datetime import datetime, timezone
+from uuid import uuid4
 from qdrant_client import QdrantClient, models
-
 
 STORAGE_PATH = Path("data/qdrant")
 COLLECTION_NAME = "documents"
 VECTOR_SIZE = 384
-
-
+SEMANTIC_CACHE_COLLECTION = "semantic_cache"
 
 def create_vector_store() -> QdrantClient:
     STORAGE_PATH.mkdir(parents=True, exist_ok=True)
@@ -27,7 +25,90 @@ def create_vector_store() -> QdrantClient:
 
     return client
 
+def create_semantic_cache_collection(
+    client: QdrantClient,
+) -> None:
+    if not client.collection_exists(SEMANTIC_CACHE_COLLECTION):
+        client.create_collection(
+            collection_name=SEMANTIC_CACHE_COLLECTION,
+            vectors_config=models.VectorParams(
+                size=VECTOR_SIZE,
+                distance=models.Distance.COSINE,
+            ),
+        )
 
+
+def store_semantic_cache_entry(
+    client: QdrantClient,
+    question: str,
+    embedding: list[float],
+    response: dict,
+    ttl_seconds: int = 600,
+) -> str:
+    if len(embedding) != VECTOR_SIZE:
+        raise ValueError("Embedding has an unexpected vector size.")
+
+    if ttl_seconds <= 0:
+        raise ValueError("TTL must be greater than zero.")
+
+    entry_id = str(uuid4())
+    expires_at = int(datetime.now(timezone.utc).timestamp()) + ttl_seconds
+
+    client.upsert(
+        collection_name=SEMANTIC_CACHE_COLLECTION,
+        points=[
+            models.PointStruct(
+                id=entry_id,
+                vector=embedding,
+                payload={
+                    "question": question,
+                    "response": response,
+                    "expires_at": expires_at,
+                },
+            )
+        ],
+        wait=True,
+    )
+
+    return entry_id
+
+
+def search_semantic_cache(
+    client: QdrantClient,
+    query_embedding: list[float],
+    similarity_threshold: float = 0.90,
+) -> dict | None:
+    if len(query_embedding) != VECTOR_SIZE:
+        raise ValueError("Query embedding has an unexpected vector size.")
+
+    if not -1.0 <= similarity_threshold <= 1.0:
+        raise ValueError("Similarity threshold must be between -1 and 1.")
+
+    results = client.query_points(
+        collection_name=SEMANTIC_CACHE_COLLECTION,
+        query=query_embedding,
+        limit=5,
+        with_payload=True,
+    ).points
+
+    now = int(datetime.now(timezone.utc).timestamp())
+
+    for result in results:
+        payload = result.payload or {}
+
+        if payload.get("expires_at", 0) <= now:
+            continue
+
+        if result.score < similarity_threshold:
+            continue
+
+        return {
+            "question": payload["question"],
+            "response": payload["response"],
+            "score": result.score,
+        }
+
+    return None
 
 def store_chunks(
     client: QdrantClient,
