@@ -1,5 +1,6 @@
 import json
 import redis
+import hashlib
 
 def get_cache_client():
     """Create a client for our local Valkey server."""
@@ -30,5 +31,15 @@ def cache_response(cache, key: str, response: dict) -> None:
         json.dumps(response),
         ex=CACHE_TTL_SECONDS,
     )
+
+def make_cache_key(question: str) -> str:
+    """Create a stable key for a normalized question."""
+    normalized_question = " ".join(question.strip().lower().split())
+
+    question_hash = hashlib.sha256(
+        normalized_question.encode("utf-8")
+    ).hexdigest()
+
+    return f"rag:v1:{question_hash}"
 
 
