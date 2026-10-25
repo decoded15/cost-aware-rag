@@ -1,0 +1,75 @@
+# Cloud Computing Architecture: A Technical Reference
+
+## 1. Introduction
+
+Cloud computing is a model for delivering computing resources such as servers, storage, databases, networking, and software over the internet. It allows organizations to access infrastructure on demand without purchasing and maintaining all their own physical hardware.
+
+Three major cloud service models are Infrastructure as a Service (IaaS), Platform as a Service (PaaS), and Software as a Service (SaaS). IaaS provides virtualized computing resources, PaaS provides a managed environment for developing and deploying applications, and SaaS delivers complete applications over the internet.
+
+## 2. Cloud Deployment Models
+
+Public clouds provide computing services over infrastructure operated by a third-party provider. Private clouds are dedicated to a single organization. Hybrid clouds combine private infrastructure with public cloud services, allowing workloads and data to be distributed according to operational requirements.
+
+Organizations select deployment models based on cost, security, regulatory requirements, performance, and operational flexibility.
+
+## 3. Microservices Architecture
+
+Microservices architecture structures an application as a collection of small, independently deployable services. Each service is responsible for a specific business capability and communicates with other services through APIs or messaging systems.
+
+This approach enables teams to develop, deploy, and scale individual components independently. However, it also introduces challenges such as network latency, distributed tracing, service discovery, and handling failures across multiple services.
+
+## 4. API Gateways
+
+An API gateway acts as an entry point between clients and backend services. It can handle request routing, authentication, rate limiting, logging, and response transformation.
+
+In systems powered by large language models, a gateway can also evaluate incoming queries and select an appropriate model. Simple questions may be handled by a smaller model, while complex reasoning tasks may be routed to a more capable model. This can help balance response quality, latency, and computational cost.
+
+## 5. Retrieval-Augmented Generation
+
+Retrieval-Augmented Generation, commonly known as RAG, combines information retrieval with text generation. Instead of relying exclusively on an LLM's learned parameters, a RAG system retrieves relevant passages from an external knowledge base and supplies them as context to the model.
+
+A typical RAG pipeline includes document ingestion, text chunking, embedding generation, vector storage, similarity search, context construction, and answer generation.
+
+During ingestion, documents are divided into smaller chunks. An embedding model converts each chunk into a numerical vector. These vectors are stored in a vector database alongside metadata such as document names and chunk indices.
+
+When a user submits a question, the system embeds the query and retrieves relevant chunks. The retrieved text is passed to the language model, which generates an answer grounded in the available context.
+
+RAG can improve access to private or frequently updated information. However, its effectiveness depends on document quality, chunking strategy, retrieval accuracy, and the language model's ability to use the supplied context correctly.
+
+## 6. Semantic Caching
+
+Caching reduces repeated computation by storing the results of previously processed requests.
+
+Exact-match caching returns a stored response when a new request matches a previous request exactly. Semantic caching uses vector embeddings to identify questions that are similar in meaning, even when their wording differs.
+
+For example, the questions "What is retrieval-augmented generation?" and "Explain RAG" may express a similar intent. A semantic cache can potentially reuse a previous answer when the similarity score exceeds a configured threshold.
+
+Semantic caching requires careful validation. Similar-looking questions can have different meanings, particularly when they contain conflicting instructions, different entities, or changed numerical constraints. Systems should apply appropriate similarity thresholds and safety checks before reusing cached answers.
+
+## 7. Cost-Aware Model Routing
+
+Large language models differ in computational requirements, response latency, and capabilities. Sending every request to the most powerful available model can increase operating costs unnecessarily.
+
+A cost-aware routing system classifies incoming questions and selects a model suited to the expected complexity of each request. Smaller models can handle straightforward questions, while larger models can be reserved for more demanding tasks.
+
+A routing system can be evaluated using classification accuracy, routing latency, answer quality, total response time, and estimated inference cost. The goal is not simply to minimize cost, but to achieve a useful balance between cost, performance, and answer quality.
+
+## 8. Measuring System Performance
+
+A production-oriented RAG gateway should measure more than answer generation time. Useful metrics include document retrieval latency, routing latency, generation latency, cache lookup latency, end-to-end latency, cache hit rate, and the model selected for each request.
+
+These measurements help identify bottlenecks and evaluate optimization strategies. Cache hits can reduce repeated computation, while model routing can avoid using unnecessarily expensive models for simple requests.
+
+A reliable evaluation should compare equivalent workloads, track answer quality, and distinguish actual cost savings from proxy measurements such as latency or cache hit rate.
+
+## 9. Reliability and Limitations
+
+RAG systems can produce incorrect answers when retrieval returns irrelevant passages, the knowledge base lacks the required information, or the language model misinterprets its context. A robust implementation should handle empty documents, invalid requests, backend failures, and missing information gracefully.
+
+Sensitive information should be protected through appropriate access controls and data-handling policies. Logs and performance metrics should avoid unnecessarily storing private user content.
+
+## 10. Conclusion
+
+An efficient AI application requires more than connecting a language model to a user interface. Retrieval, caching, model selection, observability, and error handling all influence the system's overall performance.
+
+Combining these components in a cost-aware RAG gateway provides a practical architecture for building applications that use external knowledge while balancing response quality, latency, and computational resources.
