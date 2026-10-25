@@ -1,4 +1,3 @@
-
 import json
 from time import perf_counter
 
@@ -16,6 +15,7 @@ from app.semantic_embeddings import (
     embed_semantic_question,
 )
 from app.semantic_safety import has_conflicting_intent
+from app.model_router import select_model
 from app.generation import generate_answer
 from app.vector_store import (
     create_vector_store,
@@ -41,8 +41,6 @@ def ask_question(question: str) -> dict:
 
     if not question.strip():
         raise ValueError("Question cannot be empty.")
-
-    # 1. Exact cache: cheapest lookup first.
     cache_lookup_start = perf_counter()
     cache_key = make_cache_key(question)
     cache_available = True
@@ -69,10 +67,13 @@ def ask_question(question: str) -> dict:
             "cache_lookup_ms": round(cache_lookup_ms, 2),
             "cache_hit": True,
             "semantic_cache_hit": False,
+            "routing_ms": 0.0,
+            "selected_model": None,
+            "complexity": None,
+            "routing_confidence": None,
         }
         return cached_response
 
-    # 2. Semantic cache: only after an exact-cache miss.
     semantic_lookup_start = perf_counter()
     semantic_lookup_ms = 0.0
 
@@ -113,10 +114,13 @@ def ask_question(question: str) -> dict:
                     "semantic_similarity": round(
                         semantic_result["score"], 4
                     ),
+                    "routing_ms": 0.0,
+                    "selected_model": None,
+                    "complexity": None,
+                    "routing_confidence": None,
                 },
             }
 
-            # Store the result under this exact wording too.
             if cache_available:
                 try:
                     cache_response(_cache_client, cache_key, response)
@@ -130,12 +134,10 @@ def ask_question(question: str) -> dict:
             return response
 
     except Exception:
-        # Semantic cache failure must never block normal RAG.
         semantic_lookup_ms = (
             perf_counter() - semantic_lookup_start
         ) * 1000
 
-    # 3. Both caches missed: run normal document retrieval.
     query_embedding = _embedding_model.encode(
         question,
         normalize_embeddings=True,
@@ -150,6 +152,12 @@ def ask_question(question: str) -> dict:
     retrieval_ms = (perf_counter() - retrieval_start) * 1000
 
     sources = []
+    routing_ms = 0.0
+    selected_model = None
+    complexity = None
+    routing_confidence = None
+    generation_ms = 0.0
+
     if not results:
         answer = (
             "I couldn't find relevant information "
@@ -166,6 +174,7 @@ def ask_question(question: str) -> dict:
                 f"[Source: {source}, chunk: {chunk_index}]\n"
                 f"{result['text']}"
             )
+
             sources.append({
                 "source": source,
                 "chunk_index": chunk_index,
@@ -174,18 +183,28 @@ def ask_question(question: str) -> dict:
 
         context = "\n\n".join(context_parts)
 
-        generation_start = perf_counter()
-        answer = generate_answer(question, context)
-        generation_ms = (perf_counter() - generation_start) * 1000
+        routing_start = perf_counter()
+        routing_result = select_model(question)
+        routing_ms = (perf_counter() - routing_start) * 1000
 
-    if not results:
-        generation_ms = 0.0
+        selected_model = routing_result["model"]
+        complexity = routing_result["complexity"]
+        routing_confidence = routing_result["confidence"]
+
+        generation_start = perf_counter()
+        answer = generate_answer(
+            question,
+            context,
+            model=selected_model,
+        )
+        generation_ms = (perf_counter() - generation_start) * 1000
 
     response = {
         "answer": answer,
         "sources": sources,
         "metrics": {
             "retrieval_ms": round(retrieval_ms, 2),
+            "routing_ms": round(routing_ms, 2),
             "generation_ms": round(generation_ms, 2),
             "end_to_end_ms": round(
                 (perf_counter() - request_start) * 1000, 2
@@ -194,18 +213,23 @@ def ask_question(question: str) -> dict:
             "semantic_lookup_ms": round(semantic_lookup_ms, 2),
             "cache_hit": False,
             "semantic_cache_hit": False,
+            "selected_model": selected_model,
+            "complexity": complexity,
+            "routing_confidence": (
+                round(routing_confidence, 4)
+                if routing_confidence is not None
+                else None
+            ),
         },
     }
 
-    # 4. Cache the generated answer for future requests.
     if cache_available:
         try:
             cache_response(_cache_client, cache_key, response)
         except (redis.exceptions.RedisError, TypeError, ValueError):
             pass
 
-    # Store the question and answer for semantic reuse.
-    # Never mix this BGE vector with MiniLM document vectors.
+    
     try:
         semantic_embedding = embed_semantic_question(
             question, _semantic_embedding_model
@@ -218,7 +242,6 @@ def ask_question(question: str) -> dict:
             ttl_seconds=SEMANTIC_CACHE_TTL_SECONDS,
         )
     except Exception:
-        # A semantic-cache write failure doesn't invalidate the answer.
         pass
 
     return response

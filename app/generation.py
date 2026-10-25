@@ -5,11 +5,11 @@ OLLAMA_URL = "http://localhost:11434/api/chat"
 MODEL_NAME = "qwen2.5:3b"
 
 
-def generate_answer(question: str, context: str) -> str:
+def generate_answer(question: str, context: str, model: str = "qwen2.5:3b",) -> str:
     response = requests.post(
         OLLAMA_URL,
         json={
-            "model": MODEL_NAME,
+            "model": model,
             "messages": [
                 {
                     "role": "system",
